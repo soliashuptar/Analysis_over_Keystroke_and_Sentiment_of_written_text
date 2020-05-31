@@ -1,0 +1,400 @@
+---
+title: "main"
+output: html_document
+---
+
+### Read the data
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+data.set <- read.table("dataLA.prn", header=TRUE, na.strings="*")
+data.set
+```
+
+### KeyStroke Distributions
+```{r}
+p.10 <- ggplot(data=data.set, aes(keystroke10, colour=name)) + 
+  geom_histogram(fill="white")
+p.10
+
+p.20 <- ggplot(data=data.set, aes(keystroke20, colour=name)) + 
+  geom_histogram(fill="white")
+p.20
+
+p.30 <- ggplot(data=data.set, aes(keystroke30, colour=name)) + 
+  geom_histogram(fill="white")
+p.30
+
+p.40 <- ggplot(data=data.set, aes(keystroke40, colour=name)) + 
+  geom_histogram(fill="white")
+p.40
+
+p.50 <- ggplot(data=data.set, aes(keystroke50, colour=name)) + 
+  geom_histogram(fill="white")
+p.50
+
+p.60 <- ggplot(data=data.set, aes(keystroke60, colour=name)) + 
+  geom_histogram(fill="white")
+p.60
+
+p.70 <- ggplot(data=data.set, aes(keystroke70, colour=name)) + 
+  geom_histogram(fill="white")
+p.70
+
+p.80 <- ggplot(data=data.set, aes(keystroke80, colour=name)) + 
+  geom_histogram(fill="white")
+p.80
+
+p.90 <- ggplot(data=data.set, aes(keystroke90, colour=name)) + 
+  geom_histogram(fill="white")
+p.90
+
+p.100 <- ggplot(data=data.set, aes(keystroke100, colour=name)) + 
+  geom_histogram(fill="white")
+p.100
+```
+
+### Correlation matrix
+```{r}
+require(corrplot)
+library(corrplot)
+data.set$essay_typebin <- ifelse(data.set$essay_type == "True", 1, 0)
+cor_data <- data.set[, 3:21]
+corr_matrix <- cor(cor_data)
+#simple correlation matrix
+round(corr_matrix, 2)
+#visualized
+corrplot(corr_matrix, type = 'upper', order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+We will add keystokes over 110 to outliers later because there is a strong correlation
+### Plot Data Construction
+```{r}
+val.vec <- c()
+type.vec <- c()
+sent.vec <- c()
+theme.vec <- c()
+for (i in 1:nrow(data.set)) {
+  val <- max(data.set[i, 3:19])
+  type <- data.set[i, 22]
+  sent <- data.set[i, 21]
+  theme <- data.set[i, 2]
+  val.vec <- c(val.vec, val)
+  type.vec <- c(type.vec, type)
+  sent.vec <- c(sent.vec, sent)
+  theme.vec <- c(theme.vec, theme)
+}
+plot.data <- data.frame(theme.vec, val.vec, type.vec, sent.vec)
+colnames(plot.data) <- c('Theme', 'MaxKeystroke', "TypeofEssay", "Sentiment")
+
+```
+
+### Graphs on Dependencies between Maximum Keystroke Value and its sentiment, grouped by theme
+```{r}
+#Gay Marriage
+ggplot(data=plot.data %>% filter(plot.data$Theme=='GayMerriage'), aes(MaxKeystroke, colour=TypeofEssay)) + geom_histogram() + ggtitle("Histogram of maximum keystroke over the essay on Gay Marriage")
+
+ggplot(data=plot.data %>% filter(plot.data$Theme=='GayMerriage'), aes(x = MaxKeystroke, y =Sentiment, colour=TypeofEssay)) + geom_point() + ggtitle("Dependency of maximum keystroke over the essay on Gay Marriage and its sentiment")
+
+#Gun Control
+ggplot(data=plot.data %>% filter(plot.data$Theme=='GunControl'), aes(MaxKeystroke, colour=TypeofEssay)) + geom_histogram() + ggtitle("Histogram of maximum keystroke over the essay on Gun Control")
+
+ggplot(data=plot.data %>% filter(plot.data$Theme=='GunControl'), aes(x = MaxKeystroke, y =Sentiment, colour=TypeofEssay)) + geom_point() + ggtitle("Dependency of maximum keystroke over the essay on Gun Control and its sentiment")
+
+#ReviewAMT
+ggplot(data=plot.data %>% filter(plot.data$Theme=='ReviewAMT'), aes(MaxKeystroke, colour=TypeofEssay)) + geom_histogram() + ggtitle("Dependency of maximum keystroke over the essay on Review and its sentiment")
+
+ggplot(data=plot.data %>% filter(plot.data$Theme=='ReviewAMT'), aes(x = MaxKeystroke, y =Sentiment, colour=TypeofEssay)) + geom_point() + ggtitle("Histogram of maximum keystroke over the essay on Review")
+
+
+```
+
+People writing about Gay Marriage or Gun Control try to keep neutral position compared to essays on Review of the AMT where sentiment is either very negative or very positive.
+Also we can say that huge keystroke almost never correspond to neutral opinion, so people take more time to write positive or negative thoughts.
+
+### Simple Linear Model over Sentiment and Keystrokes
+```{r}
+
+model.1 <- lm(essay_sent ~ keystroke10 + keystroke20 + keystroke30 + keystroke30 + keystroke40 + 
+                keystroke50 + keystroke60 + keystroke70 + keystroke80 + keystroke90 + keystroke100 + 
+                keystroke110 + keystroke120 + keystroke130 + keystroke140 + keystroke150 + keystroke160
+              + keystroke170 , data=data.set)
+summary(model.1)
+
+ggplot(data=data.set, aes(x = keystroke10 + keystroke20 + keystroke30 + keystroke30 + keystroke40 + 
+                keystroke50 + keystroke60 + keystroke70 + keystroke80 + keystroke90 + keystroke100 + 
+                keystroke110 + keystroke120 + keystroke130 + keystroke140 + keystroke150 + keystroke160
+              + keystroke170,  y= essay_sent)) + geom_point() + geom_smooth(method = 'lm')
+model_pred <- predict(model.1)
+model.res <- data.set$essay_sent - model_pred
+plot(model_pred, model.res)
+abline(h=0)
+```
+
+Fighting the problem of too many variables, because they become insignificant. Let`s sum over keystroke
+
+### Sum over keystrokes from 10 to 90
+```{r}
+
+vec <- c()
+for (i in 1:nrow(data.set)) {
+  vec <- c(vec, sum(data.set[i, 3:10]))
+}
+data.set$sum.10.80 <- vec 
+
+```
+
+### Filtering for treshold
+```{r}
+ind <- 90
+for (i in 11:14) {
+  ind.str <- paste(toString(ind),"bin",sep="")
+  treshold <- mean(data.set[, i]) - 0.4*mean(data.set[, i])
+  data.set[, i] <- ifelse(data.set[, i] >= treshold, 1, 0)
+  ind <- ind + 10
+}
+
+### adding keystroke >= 120 to outliers
+for ( i in 1:nrow(data.set)) {
+  data.set[i, 20] <- data.set[i, 20] + sum(data.set[i, 14:19])
+}
+
+```
+```{r}
+
+model.2 <- lm(essay_sent ~ sum.10.80 + keystroke90 + keystroke100 + 
+                keystroke110 + ouliers, data=data.set)
+summary(model.2)
+
+```
+
+### Poisson Model
+```{r}
+library(rsq)
+library(ggplot2)
+poisson.model <- glm(essay_sent ~ keystroke10 + keystroke20 + keystroke30 + keystroke30 + keystroke40 + 
+                keystroke50 + keystroke60 + keystroke70 + keystroke80 + keystroke90 + keystroke100 + 
+                keystroke110 + keystroke120 + keystroke130 + keystroke140 + keystroke150 + keystroke160
+              + keystroke170, data=data.set, family = poisson(link = "log"))
+summary(poisson.model)
+rsq(poisson.model,adj=TRUE)
+
+poisson.model <- glm(essay_sent ~ sum.10.80 + keystroke90 + keystroke100 + 
+                keystroke110 + ouliers, data=data.set, family = poisson(link = "log"))
+summary(poisson.model)
+rsq(poisson.model,adj=TRUE)
+
+plot(predict(poisson.model), data.set$essay_sent, xlab="predicted",ylab="actual")
+ abline(a=0,b=1)
+```
+
+### Logistic regression for sentiment
+```{r}
+data.set$essay_sentbin <- ifelse(data.set$essay_sent >= 5, 1, 0)
+logistic.model <- glm(essay_sentbin ~ sum.10.80 + keystroke90 + keystroke100 + 
+                keystroke110 + ouliers , data=data.set, family = "binomial")
+summary(logistic.model)
+rsq(logistic.model,adj=TRUE)
+
+plot(model_pred, data.set$essay_sentbin)
+model_pred <- predict(logistic.model)
+model.res <- data.set$essay_sentbin - model_pred
+plot(model_pred, model.res)
+abline(h=0)
+```
+
+### Logistic regression for fake/true prediction
+```{r}
+logistic.model.type <- glm(essay_typebin ~ sum.10.80 + ouliers + factor(name) , data=data.set, family = "binomial")
+summary(logistic.model.type)
+rsq(logistic.model.type,adj=TRUE)
+```
+
+### Scaling the data
+```{r}
+data.set.scaled <- data.set %>% mutate_at(c("keystroke10", "keystroke20", "keystroke30", "keystroke40", "keystroke50", "keystroke60", "keystroke70", "keystroke80", "keystroke90", "keystroke100", "keystroke110", "keystroke120", "keystroke130", "keystroke140", "keystroke150", "keystroke160", "keystroke170"), ~(scale(.) %>% as.vector))
+```
+
+Doesn`t work for us, because we get negative values for keystrokes
+
+### Ordinal Logistic Regression
+```{r}
+library(MASS)
+summary(data.set)
+
+data.set$essay_sent3 <- ifelse(data.set$essay_sent >= 6, "positive", ifelse(data.set$essay_sent <4, "negative", "neutural"))
+
+model.polr <- polr(factor(essay_sent3)~essay_typebin + keystroke90 + keystroke100 + keystroke110 + keystroke120 + factor(name), data = data.set, Hess = TRUE)
+summary(model.polr)
+(ctable <- coef(summary(model.polr)))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = p))
+```
+
+### Filtering the data
+Here i deleted every observation where number of keystrokes was less than on 0.95 conf interval
+```{r}
+library(dplyr)
+
+data.set.filtered <- data.set %>% filter(data.set$keystroke10 <= quantile(data.set$keystroke10, c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke20 <= quantile(data.set.filtered$keystroke20,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke30 <= quantile(data.set.filtered$keystroke30,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke40 <= quantile(data.set.filtered$keystroke40,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke50 <= quantile(data.set.filtered$keystroke50,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke60 <= quantile(data.set.filtered$keystroke60,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke70 <= quantile(data.set.filtered$keystroke70,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke80 <= quantile(data.set.filtered$keystroke80,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke90 <= quantile(data.set.filtered$keystroke90,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke100 <= quantile(data.set.filtered$keystroke100,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke110 <= quantile(data.set.filtered$keystroke110,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke120 <= quantile(data.set.filtered$keystroke120,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke130 <= quantile(data.set.filtered$keystroke130,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke140 <= quantile(data.set.filtered$keystroke140,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke150 <= quantile(data.set.filtered$keystroke150,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke160 <= quantile(data.set.filtered$keystroke160,c(.95)))
+data.set.filtered <- data.set.filtered %>% filter(data.set.filtered$keystroke170 <= quantile(data.set.filtered$keystroke170,c(.95)))
+
+```
+
+```{r}
+p.10 <- ggplot(data=data.set.filtered, aes(keystroke10, colour=name)) + 
+  geom_histogram(fill="white")
+p.10
+
+p.20 <- ggplot(data=data.set.filtered, aes(keystroke20, colour=name)) + 
+  geom_histogram(fill="white")
+p.20
+
+p.30 <- ggplot(data=data.set.filtered, aes(keystroke30, colour=name)) + 
+  geom_histogram(fill="white")
+p.30
+
+p.40 <- ggplot(data=data.set.filtered, aes(keystroke40, colour=name)) + 
+  geom_histogram(fill="white")
+p.40
+
+p.50 <- ggplot(data=data.set.filtered, aes(keystroke50, colour=name)) + 
+  geom_histogram(fill="white")
+p.50
+
+p.60 <- ggplot(data=data.set.filtered, aes(keystroke60, colour=name)) + 
+  geom_histogram(fill="white")
+p.60
+
+p.70 <- ggplot(data=data.set.filtered, aes(keystroke70, colour=name)) + 
+  geom_histogram(fill="white")
+p.70
+
+p.80 <- ggplot(data=data.set.filtered, aes(keystroke80, colour=name)) + 
+  geom_histogram(fill="white")
+p.80
+
+p.90 <- ggplot(data=data.set.filtered, aes(keystroke90, colour=name)) + 
+  geom_histogram(fill="white")
+p.90
+
+```
+
+### Simple Linear Model over Sentiment and Keystrokes
+```{r}
+
+model.1 <- lm(essay_sent ~ keystroke10 + keystroke20 + keystroke30 + keystroke30 + keystroke40 + 
+                keystroke50 + keystroke60 + keystroke70 + keystroke80 + keystroke90 + keystroke100 + 
+                keystroke110 + keystroke120 + keystroke130 + keystroke140 + keystroke150 + keystroke160
+              + keystroke170 , data=data.set.filtered)
+summary(model.1)
+
+ggplot(data=data.set.filtered, aes(x = keystroke10 + keystroke20 + keystroke30 + keystroke30 + keystroke40 + 
+                keystroke50 + keystroke60 + keystroke70 + keystroke80 + keystroke90 + keystroke100 + 
+                keystroke110 + keystroke120 + keystroke130 + keystroke140 + keystroke150 + keystroke160
+              + keystroke170,  y= essay_sent)) + geom_point() + geom_smooth(method = 'lm')
+model_pred <- predict(model.1)
+model.res <- data.set.filtered$essay_sent - model_pred
+plot(model_pred, model.res)
+abline(h=0)
+```
+
+Fighting the problem of too many variables, because they become insignificant. Let`s sum over keystroke
+
+### SUm over keystrokes from 10 to 90
+```{r}
+
+vec <- c()
+for (i in 1:nrow(data.set.filtered)) {
+  vec <- c(vec, sum(data.set.filtered[i, 3:10]))
+}
+data.set.filtered$sum.10.80 <- vec 
+
+```
+
+### Filtering for treshold
+```{r}
+ind <- 90
+for (i in 11:14) {
+  ind.str <- paste(toString(ind),"bin",sep="")
+  treshold <- mean(data.set.filtered[, i]) - 0.4*mean(data.set.filtered[, i])
+  data.set.filtered[, i] <- ifelse(data.set.filtered[, i] >= treshold, 1, 0)
+  ind <- ind + 10
+}
+
+### adding keystroke >= 120 to outliers
+for ( i in 1:nrow(data.set.filtered)) {
+  data.set.filtered[i, 20] <- data.set.filtered[i, 20] + sum(data.set.filtered[i, 14:19])
+}
+
+```
+
+### Poisson Model
+```{r}
+library(rsq)
+library(ggplot2)
+poisson.model <- glm(essay_sent ~ sum.10.80 + keystroke90 + keystroke100 + 
+                keystroke110 + ouliers + factor(name), data=data.set.filtered, family = poisson(link = "log"))
+summary(poisson.model)
+rsq(poisson.model,adj=TRUE)
+
+plot(predict(poisson.model), data.set.filtered$essay_sent, xlab="predicted",ylab="actual")
+ abline(a=0,b=1)
+```
+
+### Logistic regression for sentiment
+```{r}
+data.set.filtered$essay_sentbin <- ifelse(data.set.filtered$essay_sent >= 5, 1, 0)
+logistic.model <- glm(essay_sentbin ~ sum.10.80 + keystroke90 + keystroke100 + 
+                keystroke110 + ouliers , data=data.set.filtered, family = "binomial")
+summary(logistic.model)
+
+```
+
+### Logistic regression for fake/true prediction
+```{r}
+logistic.model.type <- glm(essay_typebin ~ sum.10.80 + ouliers , data=data.set.filtered, family = "binomial")
+summary(logistic.model.type)
+rsq(logistic.model.type)
+```
+
+### Ordinal Logistic Regression
+```{r}
+library(MASS)
+summary(data.set)
+
+data.set.filtered$essay_sent3 <- ifelse(data.set.filtered$essay_sent >= 6, "positive", ifelse(data.set.filtered$essay_sent <4, "negative", "neutural"))
+
+model.polr <- polr(factor(essay_sent3)~essay_typebin + keystroke90 + keystroke100 + keystroke110 + keystroke120 + factor(name), data = data.set.filtered, Hess = TRUE)
+summary(model.polr)
+(ctable <- coef(summary(model.polr)))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = p))
+```
+
+
+### Random Forest for variables selection
+```{r}
+library(randomForest)
+randForest.selection <- randomForest(factor(data.set.filtered$essay_sent3)~., data= data.set.filtered[, c(3:20)])
+importance(randForest.selection)
+```
+
